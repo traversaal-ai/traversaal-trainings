@@ -1,0 +1,8 @@
+{
+  "name": "advisor-followup",
+  "description": "Persistent new-client workflow for an advisory firm: knows who is running it and acts only on that role's work, tracks every household from intro to planning request on a shared status board, turns meeting summaries into tracked work items, builds the intake once and records only what changed after the debrief, checks required documents, prepares each action for human approval, monitors progress, escalates what stalls, and briefs before each meeting.",
+  "version": "0.2.1",
+  "author": {
+    "name": "Traversaal"
+  }
+}

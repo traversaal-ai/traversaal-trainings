@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomObject xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Follow-up History</label>
+    <pluralLabel>Follow-up History</pluralLabel>
+    <description>One dated line of a follow-up item's history. Append only.</description>
+    <nameField>
+        <label>Entry</label>
+        <type>Text</type>
+    </nameField>
+    <deploymentStatus>Deployed</deploymentStatus>
+    <sharingModel>ControlledByParent</sharingModel>
+    <enableActivities>false</enableActivities>
+    <enableHistory>true</enableHistory>
+    <enableReports>true</enableReports>
+    <fields>
+        <fullName>Item__c</fullName>
+        <label>Follow-up item</label>
+        <type>MasterDetail</type>
+        <referenceTo>Followup_Item__c</referenceTo>
+        <relationshipLabel>History</relationshipLabel>
+        <relationshipName>History</relationshipName>
+        <relationshipOrder>0</relationshipOrder>
+        <reparentableMasterDetail>false</reparentableMasterDetail>
+        <writeRequiresMasterRead>false</writeRequiresMasterRead>
+    </fields>
+    <fields>
+        <fullName>When__c</fullName>
+        <label>When</label>
+        <type>DateTime</type>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Actor__c</fullName>
+        <label>Actor</label>
+        <type>Text</type>
+        <length>120</length>
+        <externalId>false</externalId>
+        <unique>false</unique>
+        <required>false</required>
+    </fields>
+    <fields>
+        <fullName>Text__c</fullName>
+        <label>Text</label>
+        <type>LongTextArea</type>
+        <length>32768</length>
+        <visibleLines>5</visibleLines>
+    </fields>
+</CustomObject>

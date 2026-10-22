@@ -1,0 +1,85 @@
+%% One client followed end to end: Sam Reed from the introduction meeting
+%% to the planning request, as journey.py plays it in five steps.
+%% Each band is one step: the people's part first, then one run of the cycle.
+%% Matches the plugin: approvals in the channels, drafts never sent by the
+%% system, Done set only by the verifier from evidence in the real system.
+sequenceDiagram
+  autonumber
+  participant SAM as Sam Reed<br/>(client)
+  participant ZK as Zocks<br/>(meeting notes)
+  participant CY as Run cycle<br/>(twice a day)
+  participant OR as Orchestrator
+  participant BL as Board and ledger
+  participant AG as Specialist agents
+  participant VER as Verifier
+  participant ADV as Advisor<br/>(approvals channel)
+  participant OPS as Planner and Operations<br/>(operations channel)
+  participant OL as Outlook<br/>(mail, calendar)
+  participant SP as SharePoint<br/>(client folder)
+  participant SF as Salesforce
+
+  Note over SAM,SF: Step 1. Introduction: Sam meets the advisor, then the first run
+  SAM->>ZK: introduction meeting, recorded and summarised
+  ZK->>CY: introduction notes arrive (zocks-8860)
+  CY->>OR: process meeting
+  OR->>BL: Reed household created at intro_held, proceeding, 0 of 5 documents
+  OR->>AG: new prospect, create the contact (the one Tier A exception)
+  AG->>SF: create contact Sam Reed
+  OR->>BL: WI-0002 summary note for Operations, WI-0003 welcome email with form, WI-0004 discovery slots (Tier B)
+  AG->>OL: find three open slots for the discovery meeting
+  AG->>ADV: approve WI-0002, WI-0003 and a slot for WI-0004?
+  VER->>SF: contact exists?
+  VER->>BL: WI-0001 Done, evidence = contact id
+
+  Note over SAM,SF: Step 2. Welcome: the advisor approves, Sam sends his first documents, second run
+  ADV-->>BL: approve WI-0002, WI-0003, WI-0004 slot 1
+  SAM->>SP: returns the information form and his account statements
+  CY->>AG: execute the approved items
+  AG->>OL: save the welcome email as a draft, never sent by the system
+  AG->>OL: create the discovery event with Sam invited
+  AG->>OPS: hand-off: add the summary note to the record (task in Salesforce)
+  CY->>BL: documents 2 of 5, missing tax return, employer plan, estate documents
+  AG->>SP: discovery prep written from what is on file (WI-0005)
+  CY->>ADV: brief for the discovery meeting
+  VER->>OL: event exists?
+  VER->>BL: WI-0004 Done, evidence = event id
+
+  Note over SAM,SF: Step 3. Discovery: the advisor sends, the meeting happens, third run
+  ADV->>SAM: sends the welcome email and the invitation (a person sends)
+  OPS-->>BL: done WI-0002
+  SAM->>ZK: discovery meeting, recorded and summarised
+  ZK->>CY: discovery notes arrive (zocks-8870)
+  SAM->>SP: sends his tax return
+  CY->>OR: process meeting
+  OR->>BL: WI-0006 notes on the record, WI-0007 plan meeting slots, WI-0008 intake
+  AG->>SP: intake built once, from the documents and the notes (WI-0008)
+  VER->>SP: every intake line checked against its source
+  OR->>BL: intro_held to collecting_documents, 3 of 5
+  AG->>ADV: approve WI-0006 and a slot for WI-0007?
+
+  Note over SAM,SF: Step 4. Huddle: the team meets without Sam, the last documents arrive, fourth run
+  ADV-->>BL: approve WI-0006, WI-0007 slot 1
+  ZK->>CY: huddle notes arrive (huddle-8880, internal)
+  SAM->>SP: sends the employer plan statement, confirms no estate documents
+  CY->>OR: process debrief
+  AG->>SP: intake changes, only what changed (WI-0009)
+  CY->>BL: documents 5 of 5, collecting_documents to ready_for_planning
+  AG->>OL: create the plan meeting event with Sam invited (WI-0007)
+  AG->>OPS: hand-off: confirm the discovery notes on the record
+  AG->>OPS: planning request prepared with links, approve WI-0010?
+
+  Note over SAM,SF: Step 5. Planning: the planner approves, fifth run
+  OPS-->>BL: done WI-0006, approve WI-0010
+  CY->>AG: execute WI-0010
+  AG->>SF: create the planning case, links to the intake, the changes and the documents
+  SF-->>AG: CASE-00000001
+  VER->>SF: case exists?
+  VER->>BL: ready_for_planning to planning_requested, evidence = case id
+  CY->>ADV: digest per role after every run: moved, waiting, done, late
+
+  Note over SAM,SF: After the five steps: the day before the plan meeting
+  CY->>OL: client meetings tomorrow? the plan meeting with Sam
+  CY->>BL: open items for the Reed household
+  VER->>SF: planning case closed?
+  VER->>SP: plan on file in Sam's folder?
+  CY->>ADV: plan readiness review: Ready, or Not ready with what is missing

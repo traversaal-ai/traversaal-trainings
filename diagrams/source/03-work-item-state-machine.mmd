@@ -1,0 +1,17 @@
+%% Lifecycle of one follow-up work item (one ledger row).
+%% Done is decided by evidence from the real system, never by the agent that did the work.
+stateDiagram-v2
+  [*] --> Proposed: Orchestrator extracts a commitment
+  Proposed --> Approved: Tier A (auto)
+  Proposed --> AwaitingApproval: Tier B
+  Proposed --> Cancelled: Tier C recorded for human only, or rejected
+  AwaitingApproval --> Approved: advisor approves
+  AwaitingApproval --> Cancelled: advisor rejects
+  AwaitingApproval --> Blocked: no reply past SLA
+  Approved --> InProgress: specialist agent executes
+  InProgress --> Done: Verifier confirms evidence in the real system
+  InProgress --> Blocked: tool failure, or owner idle past SLA
+  Blocked --> InProgress: unblocked after escalation
+  Blocked --> Cancelled: meeting passed, or advisor cancels
+  Done --> [*]
+  Cancelled --> [*]

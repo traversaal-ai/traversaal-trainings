@@ -1,0 +1,34 @@
+# Local machine and tool state
+.claude/
+.playwright-mcp/
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# Built from advisor-followup-plugin/ (SETUP-INVESTMENT-ADVISOR-FIRM.md step 2.3)
+advisor-followup-plugin.zip
+
+# Demo run state: created by reset-demo.py, written by journey.py and the runs
+advisor-followup/ledger/
+advisor-followup/outbox/
+advisor-followup/briefs/
+advisor-followup/inbox/
+advisor-followup/households/
+advisor-followup/client-files/
+advisor-followup/salesforce/
+
+# Per-person settings and secrets, never committed. Templates are committed: config.local.md, config-investment-advisor-firm.md
+advisor-followup/config.md
+advisor-followup/live-ids.json
+advisor-followup/.sf-auth-url.txt
+advisor-followup/.sf-access-token.json
+
+# Internal planning and test records, kept local
+internal/
+advisor-followup/tests/
+
+# Design-check plugin config, local only
+.impeccable/
+journey/.state
+journey/.snapshots/

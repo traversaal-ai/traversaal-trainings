@@ -1,0 +1,412 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advisor Follow-up Architecture</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<script>(function(){var t="light";try{t=localStorage.getItem("theme")||"light"}catch(e){}document.documentElement.setAttribute("data-theme",t)})()</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: layered architecture (people, where work lives, connectors, Claude, data and runtime) with row labels on the left; a flow panel on the right walks each agent to the tools it can reach. */
+:root{
+  --bg:#f5f6f8; --canvas:#ffffff; --ink:#1b2230; --muted:#6a7383; --faint:#a7afbb; --line:#d6dbe3;
+  --people:#7d8796; --work:#3f51b5; --conn:#7b4fc2; --agent:#c2560c; --agent-fill:#fdf1e8; --agent-band:#fbe6d6;
+  --data:#1b7f5c; --wire:#c2560c; --gate:#d0331f; --limit:#b7791f;
+  --display:"Inter Tight", "Segoe UI", system-ui, sans-serif; --body:"Inter", "Segoe UI", system-ui, sans-serif; --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f131a; --canvas:#161c25; --ink:#e5eaf1; --muted:#9aa4b2; --faint:#55606e; --line:#2b3442;
+  --people:#9aa4b2; --work:#8a9bf0; --conn:#b99af0; --agent:#f0915a; --agent-fill:#2a1d14; --agent-band:#33231a;
+  --data:#5fc79f; --wire:#f0915a; --gate:#ff6b55; --limit:#e0a84a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f131a; --canvas:#161c25; --ink:#e5eaf1; --muted:#9aa4b2; --faint:#55606e; --line:#2b3442;
+  --people:#9aa4b2; --work:#8a9bf0; --conn:#b99af0; --agent:#f0915a; --agent-fill:#2a1d14; --agent-band:#33231a;
+  --data:#5fc79f; --wire:#f0915a; --gate:#ff6b55; --limit:#e0a84a; color-scheme:dark}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:14px;line-height:1.5}
+.wrap{max-width:1500px;margin:0 auto;padding-block:22px 36px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:end;justify-content:space-between}
+h1{font-family:var(--display);font-size:clamp(22px,2.8vw,30px);font-weight:700;margin:0;line-height:1.15}
+.lede{margin:4px 0 0;color:var(--muted);max-width:86ch}
+.controls{display:flex;gap:8px;align-items:center}
+button{font:600 13.5px var(--body);border:1px solid var(--line);background:var(--canvas);color:var(--ink);border-radius:8px;padding:8px 14px;cursor:pointer}
+button.primary{background:var(--agent);border-color:var(--agent);color:var(--canvas);min-width:86px}
+button:focus-visible{outline:2px solid var(--agent);outline-offset:2px}
+.bar{position:sticky;top:env(safe-area-inset-top, 0px);z-index:2;background:var(--canvas);border-bottom:1px solid var(--line);display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:start;padding:12px 16px;margin:-8px 0 8px;border-radius:12px 12px 0 0}
+.ctl{display:flex;gap:6px;flex-wrap:wrap}
+.capk{font:600 11px var(--mono);letter-spacing:.1em;color:var(--agent)}
+.capt{font-family:var(--display);font-size:18px;font-weight:700;line-height:1.25}
+.capd{font-size:13.5px;color:var(--ink);margin-top:2px}
+.capnow{margin-top:6px;font-size:13px;font-weight:600;color:var(--agent);min-height:20px}
+.b.now rect{stroke-width:3.5;fill:var(--agent-fill)}
+@media (max-width:640px){.bar{grid-template-columns:minmax(0,1fr)}}
+.stages{grid-column:1 / -1;display:flex;flex-wrap:wrap;gap:6px;order:-1}
+.stagechip{font-size:12.5px;padding:5px 10px;border-radius:999px}
+.stagechip.on{background:var(--agent);border-color:var(--agent);color:var(--canvas)}
+.stagechip.done{border-color:var(--agent);color:var(--agent)}
+.kind{display:inline-block;font:700 10.5px var(--body);letter-spacing:.05em;text-transform:uppercase;padding:2px 7px;border-radius:4px;margin-right:4px;vertical-align:1px;background:var(--agent-fill);color:var(--agent)}
+.kind.k-client,.kind.k-meeting{background:var(--gate);color:var(--canvas)}
+.kind.k-internal{background:var(--people);color:var(--canvas)}
+.kind.k-person{background:var(--work);color:var(--canvas)}
+.capnow{color:var(--ink);font-weight:400;font-size:14px}
+.capnow b{font-weight:600}
+.capdocs{margin-top:4px;font:600 12px var(--mono);color:var(--muted)}
+ol.f li.grp{margin-top:6px}
+ol.f li.ev{padding:4px 6px 4px 6px;grid-template-columns:26px minmax(0,1fr)}
+ol.f li.ev span{justify-self:center;width:8px;height:8px;border-radius:50%;margin-top:7px;background:var(--agent)}
+ol.f li.ev.k-client span,ol.f li.ev.k-meeting span{background:var(--gate)}
+ol.f li.ev.k-internal span{background:var(--people)}
+ol.f li.ev.k-person span{background:var(--work)}
+ol.f li.ev p{font-size:12.8px;color:var(--muted)}
+ol.f li.ev.on p{color:var(--ink)}
+.capd{color:var(--muted)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:16px;align-items:start}
+.board{background:var(--canvas);border:1px solid var(--line);border-radius:12px;overflow-x:auto;padding:8px 0}
+svg{display:block;width:100%;min-width:900px;height:auto}
+svg text{fill:var(--ink);font-family:var(--body)}
+.rowlab{font-family:var(--mono);font-size:11px;letter-spacing:.12em;fill:var(--muted)}
+.rowsub{font-size:10px;fill:var(--muted)}
+.b rect{fill:var(--canvas);stroke-width:1.6;transition:opacity .25s, stroke-width .25s}
+.b .t{font-weight:600;font-size:13px;text-anchor:middle}
+.b .s{font-size:10.5px;fill:var(--muted);text-anchor:middle}
+.b.people rect{stroke:var(--people)} .b.work rect{stroke:var(--work)} .b.conn rect{stroke:var(--conn)}
+.b.agent rect{stroke:var(--agent);fill:var(--agent-fill)} .b.data rect{stroke:var(--data)}
+.b.client rect{stroke:var(--gate);stroke-dasharray:5 4}
+.b.faded{opacity:.42}
+.b.lit rect{stroke-width:3}
+.dimmed .b:not(.lit){opacity:.28}
+.dimmed .wl:not(.lit){opacity:.18}
+.wl{transition:opacity .25s}
+.w{fill:none;stroke:var(--wire);stroke-width:1.5}
+.w.gate{stroke:var(--gate);stroke-width:1.8}
+.w.faint{stroke:var(--faint);stroke-dasharray:3 3}
+.el{font-size:10.5px;fill:var(--ink)}
+.el.faint{fill:var(--faint)}
+.num circle{fill:var(--agent)} .num text{fill:var(--canvas);font-size:10px;font-weight:700;text-anchor:middle}
+.band{fill:var(--agent-band);stroke:var(--agent);stroke-width:1.2}
+.bandtxt{font-size:11.5px;font-weight:600;text-anchor:middle}
+.plug{fill:none;stroke:var(--agent);stroke-dasharray:4 3;opacity:.6}
+.dotlim{fill:var(--limit)} .dotgate{fill:var(--gate)}
+#dot{fill:var(--agent);filter:drop-shadow(0 0 3px var(--agent))}
+.legend{display:flex;flex-wrap:wrap;gap:8px 20px;padding:4px 20px 6px;font-size:12.5px;color:var(--ink)}
+.legend i{display:inline-block;width:14px;height:10px;border:1.6px solid;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.legend b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:0}
+.flow{background:var(--canvas);border:1px solid var(--line);border-radius:12px;padding:18px 18px 8px;max-height:calc(100vh - 40px);overflow:auto;position:sticky;top:env(safe-area-inset-top, 0px)}
+.flow .k{font-family:var(--mono);font-size:11px;letter-spacing:.12em;color:var(--agent)}
+.flow h2{font-family:var(--display);font-size:22px;margin:4px 0 6px}
+.flow p.intro{margin:0 0 12px;color:var(--ink)}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{padding:5px 10px;font-size:12.5px}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--canvas);border-color:var(--ink)}
+ol.f{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+ol.f li{display:grid;grid-template-columns:26px minmax(0,1fr);gap:10px;padding:8px 6px;border-radius:8px;cursor:pointer}
+ol.f li .n{width:22px;height:22px;border-radius:50%;background:var(--agent);color:var(--canvas);font:700 11px var(--body);display:grid;place-items:center}
+ol.f li p{margin:0;font-size:13.5px}
+ol.f li p b{font-weight:600}
+ol.f li p span{color:var(--muted)}
+ol.f li.on{background:var(--agent-fill)}
+@media (max-width:1100px){.grid{grid-template-columns:minmax(0,1fr)}.flow{position:static;max-height:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Advisor Follow-up architecture</h1>
+      <p class="lede">The firm works in its own systems. Claude reaches them only through connectors, signed in as the person running it. Inside Claude, an orchestrator runs on a schedule and hands each job to one agent. Nothing reaches a client until a person approves it and sends it.</p>
+    </div>
+    <div class="controls">
+      <button id="theme" type="button" aria-pressed="false" title="Switch between light and dark">Dark mode</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="board">
+      <div class="bar" aria-live="polite">
+        <div class="ctl">
+          <button id="restart" type="button" title="Restart from step 1">↺ Restart</button>
+          <button id="back" type="button" aria-label="Previous step">◀</button>
+          <button id="play" class="primary" type="button">▶ Play</button>
+          <button id="next" type="button" aria-label="Next step">▶</button>
+        </div>
+        <div class="stages" id="stages" role="group" aria-label="Stages"></div>
+        <div class="cap">
+          <div class="capk" id="capk">Step 1 of 7</div>
+          <div class="capt" id="capt"></div>
+          <div class="capd" id="capd"></div>
+          <div class="capnow" id="capnow"></div>
+          <div class="capdocs" id="capdocs"></div>
+        </div>
+      </div>
+      <svg id="svg" viewBox="0 0 1080 860" aria-label="Layered architecture of the advisor follow-up workflow">
+        <defs>
+          <marker id="m" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--wire)"/></marker>
+          <marker id="mg" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--gate)"/></marker>
+          <marker id="mf" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="var(--faint)"/></marker>
+        </defs>
+
+        <!-- row labels -->
+        <text class="rowlab" x="18" y="62">PEOPLE</text>
+        <text class="rowlab" x="18" y="182">WHERE WORK LIVES</text>
+        <text class="rowlab" x="18" y="300">CONNECTORS</text>
+        <text class="rowlab" x="18" y="512">CLAUDE</text>
+        <text class="rowsub" x="18" y="528">Cowork on each</text><text class="rowsub" x="18" y="541">person's computer</text>
+        <text class="rowlab" x="18" y="770">DATA AND RUNTIME</text>
+
+        <g id="wires">
+          <!-- people to systems -->
+          <g class="wl" data-k="zocks client"><path class="w" d="M280 82 V 150" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="288" y="122">meets the advisor</text></g>
+          <g class="wl" data-k="sf firm"><path class="w" d="M452 82 V 150" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="460" y="122">closes cases</text></g>
+          <g class="wl" data-k="sp firm"><path class="w" d="M624 82 V 150" marker-end="url(#m)"/><text class="el" x="632" y="122">files client documents</text></g>
+          <g class="wl" data-k="ol firm"><path class="w" d="M840 82 V 150" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="848" y="104">reviews, sends</text></g>
+          <g class="wl" data-k="teams firm"><path class="w" d="M992 82 V 150" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="1000" y="104" text-anchor="start">approve,</text><text class="el" x="1000" y="117">done</text></g>
+          <g class="wl" data-k="ol client"><path class="w gate" d="M770 150 V 132 H 340 V 84" marker-end="url(#mg)"/><circle class="dotgate" cx="555" cy="132" r="5"/><text class="el" x="560" y="144" style="fill:var(--gate);font-weight:600">email: only after a person sends</text></g>
+          <!-- systems to connectors -->
+          <g class="wl" data-k="zocks cz"><path class="w" d="M280 206 V 268" marker-end="url(#m)"/><text class="el" x="288" y="242">summaries</text></g>
+          <g class="wl" data-k="sf csf"><path class="w" d="M452 206 V 268" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="460" y="242">records, SOQL</text></g>
+          <g class="wl" data-k="sp cms"><path class="w" d="M624 206 V 268" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="632" y="242">files</text></g>
+          <g class="wl" data-k="ol cms"><path class="w" d="M808 206 V 268" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="816" y="242">drafts, events</text></g>
+          <g class="wl" data-k="teams cms"><path class="w" d="M992 206 V 268" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="1000" y="242" text-anchor="start">messages</text></g>
+          <!-- connectors to claude -->
+          <g class="wl" data-k="cz claude"><path class="w" d="M280 322 V 380" marker-end="url(#m)"/></g>
+          <g class="wl" data-k="csf claude"><path class="w" d="M452 322 V 380" marker-start="url(#m)" marker-end="url(#m)"/></g>
+          <g class="wl" data-k="cms claude"><path class="w" d="M808 322 V 380" marker-start="url(#m)" marker-end="url(#m)"/></g>
+          <!-- claude to data -->
+          <g class="wl" data-k="model claude"><path class="w" d="M330 680 V 744" marker-start="url(#m)" marker-end="url(#m)"/><text class="el" x="338" y="716">prompts, tool results</text></g>
+          <g class="wl" data-k="proj claude"><path class="w" d="M602 680 V 744" marker-start="url(#m)"/><text class="el" x="610" y="716">rules, config, team</text></g>
+          <g class="wl" data-k="fb claude"><path class="w faint" d="M896 680 V 744" marker-start="url(#mf)" marker-end="url(#mf)"/><text class="el faint" x="904" y="716">only if a connector is off</text></g>
+        </g>
+
+        <g id="boxes"></g>
+
+        <!-- claude band -->
+        <rect class="band" x="200" y="380" width="848" height="300" rx="8" style="fill:none"/>
+        <rect class="band" x="200" y="380" width="848" height="26" rx="8"/>
+        <text class="bandtxt" x="624" y="397">Permissions · each agent's tool allowlist, checked by Claude on every tool call</text>
+        <rect class="plug" x="214" y="416" width="820" height="22" rx="4"/>
+        <text x="624" y="431" style="font-size:10.5px;fill:var(--agent);text-anchor:middle;opacity:.8">Plugin advisor-followup from the repo · commands · skills · agents</text>
+        <path class="w" d="M276 505 V 520 H 970 V 505 M415 520 V 505 M554 520 V 505 M693 520 V 505 M832 520 V 505 M690 520 V 548" />
+        <path class="w" d="M840 576 H 812" marker-end="url(#m)"/>
+        <rect class="band" x="200" y="654" width="848" height="26" rx="8"/>
+        <text class="bandtxt" x="624" y="671">Approval gate · anything client-facing is a draft or a proposal until a person approves it in Teams</text>
+
+        <circle id="dot" r="6" cx="-20" cy="-20"/>
+      </svg>
+      <div class="legend">
+        <span><i style="border-color:var(--people)"></i>People</span>
+        <span><i style="border-color:var(--work)"></i>Where work lives</span>
+        <span><i style="border-color:var(--conn)"></i>Connector</span>
+        <span><i style="border-color:var(--agent);background:var(--agent-fill)"></i>Agent</span>
+        <span><i style="border-color:var(--data)"></i>Data and runtime</span>
+        <span><b style="background:var(--limit)"></b>Needs an admin to switch on writes</span>
+        <span><b style="background:var(--gate)"></b>Crosses to the client</span>
+        <span>Double arrow: reads and writes</span>
+      </div>
+    </div>
+
+    <aside class="flow">
+      <div class="k">FLOW</div>
+      <h2 id="fh">All agents</h2>
+      <div class="tabs" role="group" aria-label="Flow">
+        <button type="button" data-mode="journey" aria-pressed="true">Sam Reed, end to end</button>
+        <button type="button" data-mode="agents" aria-pressed="false">All agents</button>
+      </div>
+      <p class="intro" id="fi"></p>
+      <ol class="f" id="fl"></ol>
+    </aside>
+  </div>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+const BOX=[
+  ["client","client",200,30,170,52,"Client · Sam Reed","outside the firm"],
+  ["firm","people",384,30,664,52,"The firm","advisor · paraplanner · planner · operations"],
+  ["zocks","work",200,150,160,56,"Zocks","meeting notes"],
+  ["sf","work",372,150,160,56,"Salesforce","households · to-dos · cases"],
+  ["sp","work",544,150,160,56,"SharePoint","client folders · intake"],
+  ["ol","work",716,150,160,56,"Outlook","mail drafts · calendar"],
+  ["teams","work",888,150,160,56,"Microsoft Teams","approvals · operations"],
+  ["cz","conn",200,268,160,54,"Zocks connector","read only"],
+  ["csf","conn",372,268,160,54,"Salesforce MCP","Headless 360 · signs in as you","limit"],
+  ["cms","conn",544,268,504,54,"Microsoft 365","signs in as you · SharePoint, Outlook, Teams","limit"],
+  ["a2","agent",214,450,124,55,"Salesforce","contacts · tasks","2"],
+  ["a3","agent",353,450,124,55,"Scheduler","slots · bookings","3"],
+  ["a4","agent",492,450,124,55,"Email","drafts only","4"],
+  ["a5","agent",631,450,124,55,"Document","intake · briefs","5"],
+  ["a6","agent",770,450,124,55,"Delegation","to Operations","6"],
+  ["a7","agent",909,450,124,55,"Checker","read-only","7"],
+  ["proj","agent",214,548,300,55,"Skills","to-dos · board · intake · documents · planning · briefs"],
+  ["a1","agent",560,548,260,55,"Orchestrator","run-cycle · 08:00 · 14:00","1"],
+  ["sched","agent",840,548,194,55,"Schedule","scheduled task · this computer"],
+  ["model","data",200,744,260,56,"Claude model","Opus 5.5 · Anthropic cloud"],
+  ["projf","data",472,744,260,56,"Project folder","instructions · config.md · team.md · playbooks"],
+  ["fb","data faded",744,744,304,56,"Local fallback folders","inbox/ · salesforce/ · outbox/ · client-files/"]
+];
+const P={}, NAME={}; const boxes=document.getElementById("boxes");
+BOX.forEach(([id,cls,x,y,w,h,t,s,ex])=>{
+  P[id]={x,y,w,h}; NAME[id]=t;
+  const g=document.createElementNS(NS,"g"); g.setAttribute("class","b "+cls); g.dataset.id=id;
+  let html=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5"/><text class="t" x="${x+w/2}" y="${y+h/2-2}">${t}</text><text class="s" x="${x+w/2}" y="${y+h/2+14}">${s}</text>`;
+  if(ex==="limit") html+=`<circle class="dotlim" cx="${x+w-10}" cy="${y+10}" r="4.5"/>`;
+  else if(ex) html+=`<g class="num"><circle cx="${x+2}" cy="${y+2}" r="9"/><text x="${x+2}" y="${y+5.5}">${ex}</text></g>`;
+  g.innerHTML=html; boxes.appendChild(g);
+});
+const COL={zocks:[280,"cz","Zocks"],sf:[452,"csf","Salesforce"],sp:[624,"cms","SharePoint"],ol:[808,"cms","Outlook"],teams:[992,"cms","Teams"]};
+const KIND={client:"Client",meeting:"Client meeting",internal:"Internal meeting",person:"A person",agent:"Agent"};
+// journey events: [kind, from, to, text, docs]
+const J=[
+ {stage:"Introduction",date:"Fri 16 Oct",sub:"Sam meets the firm for the first time.",ev:[
+  ["meeting","client","zocks","Sam has his introduction meeting with the advisor. Zocks records it and writes the summary."],
+  ["agent","a1","zocks","The 17:00 run reads the new meeting notes: Sam agreed to go ahead."],
+  ["agent","a1","sf","Checks Salesforce for Sam by name and email: no match, so he is a new client."],
+  ["agent","a2","sf","Creates Sam as a contact and adds the Reed household to the status board."],
+  ["agent","a5","sp","Creates Sam's client folder in SharePoint."],
+  ["agent","a4","ol","Drafts the welcome email with the information form and the list of 5 documents to send."],
+  ["agent","a3","ol","Finds three free discovery slots, at least 3 working days out."],
+  ["agent","a1","teams","Asks the advisor in Teams to approve the email, the slots and a note for Operations."]]},
+ {stage:"Welcome and documents",date:"Mon 19 Oct",sub:"The advisor approves. Sam is asked for his documents.",ev:[
+  ["person","firm","teams","The advisor replies 'approve' in Teams. Only names listed in team.md count."],
+  ["agent","a1","teams","The 10:00 run reads the approvals."],
+  ["agent","a3","ol","Books the discovery meeting for Wed 21 Oct, 15:00, with Sam invited; the calendar sends the approved invitation."],
+  ["person","firm","ol","The advisor reviews the welcome email draft and presses Send."],
+  ["client","ol","client","The email reaches Sam: the form and the list of documents. This is the only way anything leaves the firm.",0],
+  ["client","client","sp","Sam returns the form and a bank statement. Staff file them in his folder."],
+  ["agent","a1","sp","Document check: 2 of 5 documents on file.",2],
+  ["agent","a5","sp","Discovery is in 2 working days, so it writes the discovery prep and a brief for the advisor.",2]]},
+ {stage:"Discovery",date:"Wed 21 Oct",sub:"The advisor runs discovery with the prep in hand.",ev:[
+  ["meeting","client","zocks","Sam's discovery meeting. Zocks records it: first home in 3 to 5 years, independence by his early fifties.",2],
+  ["agent","a1","zocks","The 17:00 run reads the discovery notes.",2],
+  ["agent","a5","sp","Builds the intake, once, from the notes and Sam's documents.",2],
+  ["agent","a7","sp","The checker re-reads every line against its source. One correction.",2],
+  ["client","client","sp","Sam sends his tax return.",3],
+  ["agent","a1","sp","Document check: 3 of 5. The welcome email already asked for the other two, so no second email.",3],
+  ["agent","a2","sf","Status board: Sam moves to Collecting documents.",3],
+  ["agent","a3","ol","Proposes plan meeting times from 4 Nov, after planning can finish.",3]]},
+ {stage:"Documents",date:"21 to 23 Oct",sub:"Every run checks Sam's folder against the required list.",ev:[
+  ["agent","a1","sp","Each run lists Sam's folder. Still missing: employer plan statement, estate documents.",3],
+  ["agent","a4","ol","If they stayed missing: a reminder listing only what is missing, on day 3, 6 and 9, each approved by the advisor.",3],
+  ["client","client","sp","Sam sends his employer plan statement and confirms he has no will.",5],
+  ["agent","a1","sp","Document check: 5 of 5. Nothing more to chase.",5]]},
+ {stage:"Team huddle (internal)",date:"Fri 23 Oct",sub:"Advisor, paraplanner and planner meet without Sam.",ev:[
+  ["internal","firm","zocks","Internal huddle about the Reed household. The client is not there. The notes are captured.",5],
+  ["agent","a1","zocks","Reads the huddle notes. No client follow-ups come from an internal meeting.",5],
+  ["agent","a5","sp","Writes a separate 'what changed' note: home in about 2 years, use the stock grant toward the deposit. The intake is never rewritten.",5],
+  ["agent","a3","ol","Books the plan meeting for Wed 4 Nov, 14:00.",5],
+  ["agent","a2","sf","Status board: Sam is Ready for planning.",5],
+  ["agent","a1","teams","Asks the planner to approve the planning request, with links to the intake, the changes and all 5 documents.",5]]},
+ {stage:"Planning",date:"Mon 26 Oct",sub:"The planner approves. The planning team takes over.",ev:[
+  ["person","firm","teams","The planner replies 'approve'. Only the planner's reply counts for this.",5],
+  ["agent","a2","sf","Creates the planning case in Salesforce, with links, not attachments.",5],
+  ["agent","a7","sf","Tracks the case on every run until it closes.",5],
+  ["agent","a5","sp","The day before the plan meeting: a readiness review. 'Ready' only if the case is closed and the plan is on file.",5],
+  ["agent","a6","teams","After the plan meeting: each implementation task goes to Operations with a due date.",5]]}
+];
+const AG=[
+  {id:"a1",name:"Orchestrator agent",d:"Runs at 08:00 and 14:00. Works out what each household needs and hands each job to one agent.",visits:[["sf","reads every household's stage and open to-dos"],["zocks","reads new meeting notes"],["teams","posts approval requests and a digest"]]},
+  {id:"a2",name:"Salesforce agent",d:"Keeps the client record: new prospects after a duplicate check, and tasks and cases once approved.",visits:[["sf","creates the contact, task or case"]]},
+  {id:"a3",name:"Scheduler agent",d:"Proposes three slots, then books the approved one with the client invited.",visits:[["ol","reads free time and books the meeting"],["teams","posts the slots for the advisor"]]},
+  {id:"a4",name:"Email agent",d:"Writes client emails in approved wording. Drafts only; a person sends.",visits:[["ol","saves the draft"],["teams","asks the advisor to approve it"]]},
+  {id:"a5",name:"Document agent",d:"Discovery prep, the intake (once), the 'what changed' note, briefs. Every line cited.",visits:[["sp","reads documents, saves new files"]]},
+  {id:"a6",name:"Delegation agent",d:"Hands approved work to Operations with the details and a due date.",visits:[["teams","posts in the operations channel"],["sf","creates the matching task"]]},
+  {id:"a7",name:"Checker agent",d:"The only agent that marks work done, and it can only read.",visits:[["sf","is the case closed?"],["sp","is the document there?"],["ol","was the email sent?"],["teams","did Operations reply 'done'?"]]}
+];
+const svg=document.getElementById("svg"), dot=document.getElementById("dot"), fl=document.getElementById("fl"), fi=document.getElementById("fi"), fh=document.getElementById("fh");
+const $=id=>document.getElementById(id);
+const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;
+let mode="journey", seq=[], groups=[], cur=0, playing=false, raf=null, token=0;
+const SPEED=0.32, HOLD=2600;
+
+function build(){
+  seq=[]; groups=[];
+  if(mode==="journey"){ let docs=0;
+    J.forEach((s,gi)=>{groups.push({name:s.stage,date:s.date,sub:s.sub,start:seq.length});
+      s.ev.forEach(([kind,from,to,text,d])=>{ if(d!==undefined) docs=d; seq.push({g:gi,kind,from,to,text,docs});});});
+  } else {
+    AG.forEach((a,gi)=>{groups.push({name:a.name,date:"",sub:a.d,start:seq.length});
+      a.visits.forEach(([to,text])=>seq.push({g:gi,kind:"agent",from:a.id,to,text}));});
+  }
+}
+function pathFor(e){
+  const {from,to}=e;
+  if(from==="client"&&to==="zocks") return [[280,82],[280,150]];
+  if(from==="client"&&to==="sp") return [[340,82],[340,140],[610,140],[610,150]];
+  if(from==="ol"&&to==="client") return [[770,150],[770,132],[340,132],[340,84]];
+  if(from==="firm"&&to==="zocks") return [[400,82],[400,132],[300,132],[300,150]];
+  if(from==="firm") return [[COL[to][0],82],[COL[to][0],150]];
+  const a=P[from],[x]=COL[to],mid=a.x+a.w/2,corr=a.y>540?540:444;
+  return [[mid,a.y],[mid,corr],[x,corr],[x,206]];
+}
+function lightFor(e){
+  const ids=new Set([e.from,e.to]), wires=new Set();
+  if(COL[e.to] && e.from.startsWith("a")){ids.add(COL[e.to][1]); wires.add(`${e.to} ${COL[e.to][1]}`); wires.add(`${COL[e.to][1]} claude`);}
+  if(e.from==="client"&&e.to==="zocks"){wires.add("zocks client");ids.add("firm");}
+  if(e.from==="ol"&&e.to==="client") wires.add("ol client");
+  if(e.from==="firm"&&COL[e.to]) wires.add(`${e.to} firm`);
+  svg.classList.add("dimmed");
+  document.querySelectorAll(".b").forEach(b=>{b.classList.toggle("lit",ids.has(b.dataset.id));b.classList.toggle("now",b.dataset.id===e.from||b.dataset.id===e.to);});
+  document.querySelectorAll(".wl").forEach(w=>w.classList.toggle("lit",wires.has(w.dataset.k)));
+}
+function travel(pts,my){return new Promise(res=>{
+  dot.setAttribute("class",""); 
+  if(reduce){const e=pts[pts.length-1];dot.setAttribute("cx",e[0]);dot.setAttribute("cy",e[1]);return res();}
+  const seg=pts.slice(1).map((p,i)=>Math.hypot(p[0]-pts[i][0],p[1]-pts[i][1])), L=seg.reduce((a,b)=>a+b,0), t0=performance.now();
+  (function f(now){ if(my!==token) return res();
+    let d=Math.min((now-t0)*SPEED,L), i=0; while(i<seg.length-1&&d>seg[i]){d-=seg[i];i++;}
+    const a=pts[i],b=pts[i+1],u=seg[i]?Math.min(d/seg[i],1):1;
+    dot.setAttribute("cx",a[0]+(b[0]-a[0])*u); dot.setAttribute("cy",a[1]+(b[1]-a[1])*u);
+    if((now-t0)*SPEED<L) raf=requestAnimationFrame(f); else res();})(t0);
+});}
+function caption(i){
+  const e=seq[i], g=groups[e.g], inG=i-g.start+1, nG=(groups[e.g+1]?.start??seq.length)-g.start;
+  $("capk").textContent = mode==="journey" ? `Stage ${e.g+1} of ${groups.length} · ${g.date} · step ${inG} of ${nG}` : `Agent ${e.g+1} of ${groups.length} · ${inG} of ${nG}`;
+  $("capt").textContent=g.name; $("capd").textContent=g.sub;
+  const who = e.from==="ol"?"Outlook":NAME[e.from], where = e.to==="client"?"Sam":(COL[e.to]?COL[e.to][2]:NAME[e.to]);
+  $("capnow").innerHTML=`<span class="kind k-${e.kind}">${KIND[e.kind]}</span> <b>${who} → ${where}</b> · ${e.text}`;
+  $("capdocs").textContent = mode==="journey" && e.docs!==undefined ? `Sam's documents: ${e.docs} of 5` : "";
+  document.querySelectorAll(".stagechip").forEach((c,k)=>{c.classList.toggle("on",k===e.g);c.classList.toggle("done",k<e.g);});
+  [...fl.querySelectorAll("li.ev")].forEach((li,k)=>li.classList.toggle("on",k===i));
+  [...fl.querySelectorAll("li.grp")].forEach((li,k)=>li.classList.toggle("on",k===e.g));
+  const cur_li=fl.querySelector("li.ev.on"), box=document.querySelector(".flow");
+  if(cur_li && box.scrollHeight>box.clientHeight+4){const top=cur_li.offsetTop-box.offsetTop-box.clientHeight/2; box.scrollTo({top,behavior:reduce?"auto":"smooth"});}
+}
+async function step(i,my){
+  cur=i; caption(i); lightFor(seq[i]);
+  await travel(pathFor(seq[i]),my);
+  if(my!==token) return;
+  setTimeout(()=>{ if(my!==token||!playing) return; if(cur<seq.length-1) step(cur+1,my); else {pause(); $("capnow").innerHTML+="<br><b>End.</b> Press Restart to watch again.";}}, HOLD);
+}
+function show(i){token++;cancelAnimationFrame(raf);cur=i;caption(i);lightFor(seq[i]);const p=pathFor(seq[i]),e=p[p.length-1];dot.setAttribute("cx",e[0]);dot.setAttribute("cy",e[1]);}
+function play(){playing=true;$("play").textContent="❚❚ Pause";token++;step(cur,token);}
+function pause(){playing=false;$("play").textContent="▶ Play";token++;cancelAnimationFrame(raf);}
+$("play").addEventListener("click",()=>playing?pause():play());
+$("next").addEventListener("click",()=>{pause();show(Math.min(cur+1,seq.length-1));});
+$("back").addEventListener("click",()=>{pause();show(Math.max(cur-1,0));});
+$("restart").addEventListener("click",()=>{pause();cur=0;play();});
+function render(){
+  build();
+  $("stages").innerHTML = groups.map((g,k)=>`<button type="button" class="stagechip" data-g="${k}">${mode==="journey"?g.name:(k+1)+". "+g.name.replace(" agent","")}</button>`).join("");
+  $("stages").querySelectorAll(".stagechip").forEach(b=>b.addEventListener("click",()=>{pause();show(groups[+b.dataset.g].start);}));
+  fh.textContent = mode==="journey" ? "Sam Reed, end to end" : "All agents";
+  fi.textContent = mode==="journey" ? "One new client through every stage, as it ran in the demo. Red steps involve the client; grey steps are internal meetings." : "Each agent in turn, and every system it can reach.";
+  let h=""; groups.forEach((g,k)=>{ h+=`<li class="grp" data-g="${k}"><span class="n">${k+1}</span><p><b>${g.name}</b>${g.date?` <span>${g.date}</span>`:""}</p></li>`;
+    seq.forEach((e,i)=>{ if(e.g===k) h+=`<li class="ev k-${e.kind}" data-i="${i}"><span></span><p>${e.text}</p></li>`; }); });
+  fl.innerHTML=h;
+  fl.querySelectorAll("li.ev").forEach(li=>li.addEventListener("click",()=>{pause();show(+li.dataset.i);}));
+  fl.querySelectorAll("li.grp").forEach(li=>li.addEventListener("click",()=>{pause();show(groups[+li.dataset.g].start);}));
+  show(0);
+}
+document.querySelectorAll("[data-mode]").forEach(b=>b.addEventListener("click",()=>{
+  mode=b.dataset.mode; document.querySelectorAll("[data-mode]").forEach(x=>x.setAttribute("aria-pressed",String(x===b))); pause(); render();}));
+render();
+
+// Light by default. The switch flips to dark and the choice is remembered in this browser.
+const themeBtn=$("theme");
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme",t);
+  themeBtn.textContent=t==="dark"?"Light mode":"Dark mode";
+  themeBtn.setAttribute("aria-pressed",String(t==="dark"));
+  try{localStorage.setItem("theme",t)}catch(e){}
+}
+themeBtn.addEventListener("click",()=>applyTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark"));
+applyTheme(document.documentElement.getAttribute("data-theme")||"light");
+</script>
